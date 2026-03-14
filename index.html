@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravelSaver Pro</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TravelSaver">
+    
+    <style>
+        :root {
+            --primary: #00b894;
+            --secondary: #0984e3;
+            --dark: #2d3436;
+            --light: #dfe6e9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            color: var(--dark);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 0 0 25px 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 500px;
+            margin: -30px auto 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        h2 { font-size: 1.2rem; margin-top: 0; }
+
+        /* Stil för din Travelpayouts Widget */
+        .widget-container {
+            min-height: 200px;
+        }
+
+        .favorites-section {
+            margin-top: 30px;
+        }
+
+        .fav-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--primary);
+        }
+
+        .offline-badge {
+            display: none;
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 10px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .btn-save {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>TravelSaver ✈️</h1>
+    <p>Hitta billigaste flyg & hotell</p>
+</div>
+
+<div class="container">
+    <div id="offline-status" class="offline-badge">
+        ⚠️ Du är offline. Du kan se dina sparade resor men inte söka nya.
+    </div>
+
+    <div class="card">
+        <h2>Sök din resa</h2>
+        <div class="widget-container" id="search-widget">
+            <script data-noptimize="1" data-cfasync="false" data-wpfc-render="false">
+                (function () {
+                    var script = document.createElement("script");
+                    script.async = 1;
+                    script.src = 'https://tp-em.com/NTA3ODMw.js?t=507830';
+                    document.head.appendChild(script);
+                })();
+            </script>
+            </div>
+    </div>
+
+    <div class="card">
+        <h2>Snabba påminnelser</h2>
+        <input type="text" id="fav-dest" placeholder="Stad du bevakar..." style="width:92%; padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #ddd;">
+        <button class="btn-save" onclick="saveFavorite()">Spara i minnet (Offline)</button>
+    </div>
+
+    <div class="favorites-section">
+        <h3>Dina Sparade Resor</h3>
+        <div id="fav-list">
+            </div>
+    </div>
+</div>
+
+<script>
+    // 1. Kolla om vi är online/offline
+    function updateOnlineStatus() {
+        const status = document.getElementById('offline-status');
+        const widget = document.getElementById('search-widget');
+        if (!navigator.onLine) {
+            status.style.display = 'block';
+            widget.style.opacity = '0.3';
+        } else {
+            status.style.display = 'none';
+            widget.style.opacity = '1';
+        }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
+    // 2. Hantera Favoriter (LocalStorage - fungerar offline!)
+    function saveFavorite() {
+        const input = document.getElementById('fav-dest');
+        const destination = input.value;
+        if (!destination) return;
+
+        let favs = JSON.parse(localStorage.getItem('myTravelFavs')) || [];
+        favs.push({ name: destination, date: new Date().toLocaleDateString() });
+        localStorage.setItem('myTravelFavs', JSON.stringify(favs));
+        
+        input.value = '';
+        renderFavorites();
+    }
+
+    function renderFavorites() {
+        const list = document.getElementById('fav-list');
+        const favs = JSON.parse(localStorage.getItem('myTravelFavs')) || [];
+        
+        if (favs.length === 0) {
+            list.innerHTML = '<p style="color:gray;">Inga sparade resor ännu.</p>';
+            return;
+        }
+
+        list.innerHTML = favs.map((f, index) => `
+            <div class="fav-item">
+                <div>
+                    <strong>${f.name}</strong><br>
+                    <small style="color:gray;">Sparad: ${f.date}</small>
+                </div>
+                <button onclick="deleteFav(${index})" style="background:none; border:none; color:#ff4757; font-size:20px;">✕</button>
+            </div>
+        `).join('');
+    }
+
+    function deleteFav(index) {
+        let favs = JSON.parse(localStorage.getItem('myTravelFavs'));
+        favs.splice(index, 1);
+        localStorage.setItem('myTravelFavs', JSON.stringify(favs));
+        renderFavorites();
+    }
+
+    // Kör vid start
+    renderFavorites();
+</script>
+
+</body>
+</html>
