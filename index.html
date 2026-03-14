@@ -3,86 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelSaver Pro</title>
+    <title>TravelSaver Pro - Flygbokning</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        :root { --primary: #00b894; --secondary: #0984e3; }
-        body { font-family: -apple-system, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        :root { --primary: #00b894; --secondary: #0984e3; --dark: #2d3436; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .header { text-align: center; margin-bottom: 20px; width: 100%; max-width: 400px; }
+        .header h1 { color: var(--primary); margin: 0; font-size: 2rem; }
+        
         .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .flight-card { background: white; padding: 15px; border-radius: 15px; margin-top: 15px; border-left: 6px solid var(--secondary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: left; }
-        .price { font-size: 1.5rem; font-weight: bold; color: var(--secondary); }
+        
+        label { display: block; margin-top: 10px; font-size: 0.8rem; color: #636e72; font-weight: bold; }
+        input { width: 100%; padding: 12px; margin: 5px 0 15px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: var(--primary); }
+        
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); background: #00a383; }
+
+        #results { width: 100%; max-width: 400px; margin-top: 20px; }
+        .flight-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 6px solid var(--secondary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); animation: slideUp 0.3s ease-out; }
+        
+        .price { font-size: 1.6rem; font-weight: bold; color: var(--secondary); display: block; }
+        .details { font-size: 0.9rem; color: #2d3436; margin: 10px 0; line-height: 1.4; }
+        
+        .history { width: 100%; max-width: 400px; margin-top: 20px; font-size: 0.8rem; color: #636e72; }
+        .history-item { display: inline-block; background: #dfe6e9; padding: 5px 10px; border-radius: 5px; margin: 5px 5px 0 0; cursor: pointer; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1 style="color:var(--primary); margin:0;">TravelSaver ✈️</h1>
-        <p>Skriv stad (t.ex. Köpenhamn) eller kod (CPH)</p>
-        <input type="text" id="origin" placeholder="Från..." value="ARN">
-        <input type="text" id="destination" placeholder="Till...">
-        <button onclick="getCheapFlights()">SÖK RESA</button>
+    <div class="header">
+        <h1>TravelSaver ✈️</h1>
+        <p>Hitta flygfynd snabbt och enkelt</p>
     </div>
+
+    <div class="card">
+        <label>VARIFRÅN?</label>
+        <input type="text" id="origin" placeholder="Stad eller kod (t.ex. ARN)" value="ARN">
+        
+        <label>VART VILL DU ÅKA?</label>
+        <input type="text" id="destination" placeholder="Stad eller kod (t.ex. Beirut)">
+        
+        <button onclick="getCheapFlights()">SÖK BILLIGASTE PRIS</button>
+    </div>
+
+    <div class="history" id="search-history">
+        </div>
 
     <div id="results"></div>
 
     <script>
+        // DIN AKTIVA API-TOKEN
         const API_TOKEN = "07fe47ad1616e244c7ef99fb58e50b9b";
 
-        // Översättningslista: Stad till IATA-kod
+        // Utökad lista för automatisk översättning
         const cityToCode = {
-            "köpenhamn": "CPH", "copenhagen": "CPH",
-            "stockholm": "ARN", "sthlm": "ARN",
-            "london": "LON", "paris": "PAR",
-            "barcelona": "BCN", "berlin": "BER",
-            "oslo": "OSL", "new york": "NYC"
+            "köpenhamn": "CPH", "copenhagen": "CPH", "cph": "CPH",
+            "stockholm": "ARN", "sthlm": "ARN", "arn": "ARN",
+            "beirut": "BEY", "beyrouth": "BEY", "bey": "BEY",
+            "london": "LON", "lhr": "LHR",
+            "paris": "PAR", "ory": "ORY", "cdg": "CDG",
+            "barcelona": "BCN", "bcn": "BCN",
+            "oslo": "OSL", "dubai": "DXB", "dxb": "DXB"
         };
 
         async function getCheapFlights() {
             let originRaw = document.getElementById('origin').value.toLowerCase().trim();
             let destRaw = document.getElementById('destination').value.toLowerCase().trim();
             
-            // Omvandla namn till kod om det finns i listan, annars behåll som det är
+            // Översätt stad till kod
             let origin = cityToCode[originRaw] || originRaw.toUpperCase();
             let dest = cityToCode[destRaw] || destRaw.toUpperCase();
 
             const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = "<p>Hämtar priser...</p>";
+            resultsDiv.innerHTML = "<p style='text-align:center;'>Letar efter sparade fynd...</p>";
+
+            // Spara sökningen i historiken
+            saveToHistory(origin, dest);
 
             try {
-                // Vi använder en CORS-proxy för att GitHub ska tillåta anropet
+                // CORS Proxy för att tillåta anrop från GitHub Pages
                 const proxy = "https://corsproxy.io/?";
                 const apiUrl = `https://api.travelpayouts.com/v1/prices/cheap?origin=${origin}&destination=${dest}&token=${API_TOKEN}&currency=SEK`;
                 
                 const response = await fetch(proxy + encodeURIComponent(apiUrl));
                 const json = await response.json();
 
-                if (json.success && json.data[dest]) {
+                if (json.success && json.data && json.data[dest]) {
                     renderFlights(json.data[dest], dest);
                 } else {
-                    resultsDiv.innerHTML = "<div class='card'>Inga resor hittades just nu. Testa ARN till CPH!</div>";
+                    resultsDiv.innerHTML = `
+                        <div class="card">
+                            <p>Inga sparade priser hittades för <b>${origin} ➔ ${dest}</b> just nu.</p>
+                            <small>Resedatabasen uppdateras när folk söker. Prova en annan stad eller försök igen senare.</small>
+                        </div>`;
                 }
             } catch (err) {
-                resultsDiv.innerHTML = "<div class='card' style='color:red;'>Kunde inte ansluta. Testa igen om en stund.</div>";
+                resultsDiv.innerHTML = "<div class='card' style='color:red;'>Anslutningsfel. Kontrollera internet.</div>";
             }
         }
 
         function renderFlights(data, destCode) {
             const resultsDiv = document.getElementById('results');
-            let html = `<h3>Bästa priserna till ${destCode}</h3>`;
+            let html = `<h3 style='text-align:center;'>Bästa träffar till ${destCode}</h3>`;
             
-            for (let id in data) {
-                const f = data[id];
+            // Sortera efter pris
+            const flights = Object.values(data).sort((a, b) => a.price - b.price);
+
+            flights.forEach(f => {
+                const depDate = new Date(f.departure_at).toLocaleDateString('sv-SE', {
+                    day: 'numeric', month: 'short', year: 'numeric'
+                });
+                
                 html += `
                     <div class="flight-card">
-                        <span class="price">${f.price} kr</span><br>
-                        <span>📅 Datum: ${new Date(f.departure_at).toLocaleDateString()}</span><br>
-                        <small>Flygbolag: ${f.airline}</small>
-                        <button style="margin-top:10px; background:var(--secondary); padding:8px;" onclick="window.open('https://www.aviasales.com')">BOKA NU</button>
+                        <span class="price">${f.price.toLocaleString()} kr</span>
+                        <div class="details">
+                            <b>Datum:</b> ${depDate}<br>
+                            <b>Flygbolag:</b> ${f.airline}<br>
+                            <b>Flight:</b> ${f.flight_number}
+                        </div>
+                        <button style="background:var(--secondary); padding:10px; font-size:14px;" 
+                                onclick="window.open('https://www.aviasales.com')">
+                            VISA BILJETT
+                        </button>
                     </div>`;
-            }
+            });
             resultsDiv.innerHTML = html;
         }
+
+        function saveToHistory(from, to) {
+            let history = JSON.parse(localStorage.getItem('travelHistory')) || [];
+            const searchStr = `${from}-${to}`;
+            if (!history.includes(searchStr)) {
+                history.unshift(searchStr);
+                if (history.length > 5) history.pop();
+                localStorage.setItem('travelHistory', JSON.stringify(history));
+                displayHistory();
+            }
+        }
+
+        function displayHistory() {
+            const histDiv = document.getElementById('search-history');
+            let history = JSON.parse(localStorage.getItem('travelHistory')) || [];
+            if (history.length > 0) {
+                histDiv.innerHTML = "Senaste sökningar: <br>" + history.map(h => `
+                    <span class="history-item" onclick="quickSearch('${h}')">${h}</span>
+                `).join('');
+            }
+        }
+
+        function quickSearch(searchStr) {
+            const parts = searchStr.split('-');
+            document.getElementById('origin').value = parts[0];
+            document.getElementById('destination').value = parts[1];
+            getCheapFlights();
+        }
+
+        // Ladda historik vid start
+        displayHistory();
     </script>
 </body>
 </html>
