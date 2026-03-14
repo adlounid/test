@@ -3,106 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelSaver - Billiga Flyg</title>
+    <title>TravelSaver Pro</title>
     <style>
-        :root { --primary: #00b894; --secondary: #0984e3; --accent: #6c5ce7; }
+        :root { --primary: #00b894; --secondary: #0984e3; }
         body { font-family: -apple-system, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; text-transform: uppercase; }
-        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
-        #results { width: 100%; max-width: 400px; margin-top: 20px; }
-        .flight-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 6px solid var(--secondary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .price { font-size: 1.5rem; font-weight: bold; color: var(--secondary); display: block; margin-top: 5px; }
-        .meta { font-size: 0.85rem; color: #636e72; margin-top: 8px; line-height: 1.4; }
-        .error { color: #d63031; background: #fab1a0; padding: 10px; border-radius: 10px; font-size: 0.9rem; margin-top: 10px; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .flight-card { background: white; padding: 15px; border-radius: 15px; margin-top: 15px; border-left: 6px solid var(--secondary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: left; }
+        .price { font-size: 1.5rem; font-weight: bold; color: var(--secondary); }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h1 style="color:var(--primary); margin:0;">TravelSaver ✈️</h1>
-        <p style="font-size:0.9rem; color:#636e72;">Hitta de absolut lägsta priserna just nu</p>
-        
-        <input type="text" id="origin" placeholder="Från (t.ex. ARN)" value="ARN">
-        <input type="text" id="destination" placeholder="Till (t.ex. CPH)">
-        <button onclick="getCheapFlights()">VISA BILLIGASTE RESOR</button>
+        <p>Skriv stad (t.ex. Köpenhamn) eller kod (CPH)</p>
+        <input type="text" id="origin" placeholder="Från..." value="ARN">
+        <input type="text" id="destination" placeholder="Till...">
+        <button onclick="getCheapFlights()">SÖK RESA</button>
     </div>
 
     <div id="results"></div>
 
     <script>
-        // DIN NYA API-NYCKEL
         const API_TOKEN = "07fe47ad1616e244c7ef99fb58e50b9b";
 
-        // Ordlista för städer
-        const cityLookup = {
-            "ARN": "Stockholm", "CPH": "Köpenhamn", "BCN": "Barcelona", 
-            "LON": "London", "NYC": "New York", "PAR": "Paris", 
-            "BER": "Berlin", "AGP": "Malaga", "OSL": "Oslo"
+        // Översättningslista: Stad till IATA-kod
+        const cityToCode = {
+            "köpenhamn": "CPH", "copenhagen": "CPH",
+            "stockholm": "ARN", "sthlm": "ARN",
+            "london": "LON", "paris": "PAR",
+            "barcelona": "BCN", "berlin": "BER",
+            "oslo": "OSL", "new york": "NYC"
         };
 
         async function getCheapFlights() {
-            const origin = document.getElementById('origin').value.toUpperCase().trim();
-            const dest = document.getElementById('destination').value.toUpperCase().trim();
+            let originRaw = document.getElementById('origin').value.toLowerCase().trim();
+            let destRaw = document.getElementById('destination').value.toLowerCase().trim();
+            
+            // Omvandla namn till kod om det finns i listan, annars behåll som det är
+            let origin = cityToCode[originRaw] || originRaw.toUpperCase();
+            let dest = cityToCode[destRaw] || destRaw.toUpperCase();
+
             const resultsDiv = document.getElementById('results');
-
-            if (!origin || !dest) {
-                resultsDiv.innerHTML = "<div class='error'>Fyll i både från och till (t.ex. ARN och CPH)</div>";
-                return;
-            }
-
-            resultsDiv.innerHTML = "<p style='text-align:center;'>Letar efter de bästa priserna...</p>";
+            resultsDiv.innerHTML = "<p>Hämtar priser...</p>";
 
             try {
-                // Vi använder "Prices Cheap" API - Mycket snabbt för fynd
-                const url = `https://api.travelpayouts.com/v1/prices/cheap?origin=${origin}&destination=${dest}&token=${API_TOKEN}&currency=SEK`;
+                // Vi använder en CORS-proxy för att GitHub ska tillåta anropet
+                const proxy = "https://corsproxy.io/?";
+                const apiUrl = `https://api.travelpayouts.com/v1/prices/cheap?origin=${origin}&destination=${dest}&token=${API_TOKEN}&currency=SEK`;
                 
-                const response = await fetch(url);
+                const response = await fetch(proxy + encodeURIComponent(apiUrl));
                 const json = await response.json();
 
                 if (json.success && json.data[dest]) {
                     renderFlights(json.data[dest], dest);
                 } else {
-                    resultsDiv.innerHTML = `
-                        <div class="card">
-                            <p>Inga priser hittades just nu för ${dest}.<br><br>
-                            Tryck på sök igen eller testa en annan stad.</p>
-                        </div>`;
+                    resultsDiv.innerHTML = "<div class='card'>Inga resor hittades just nu. Testa ARN till CPH!</div>";
                 }
             } catch (err) {
-                resultsDiv.innerHTML = `
-                    <div class="error">
-                        <b>Kunde inte hämta data.</b><br>
-                        Detta beror oftast på att API-nyckeln inte aktiverats hos Travelpayouts ännu. Det kan ta upp till 24h.
-                    </div>`;
-                console.error(err);
+                resultsDiv.innerHTML = "<div class='card' style='color:red;'>Kunde inte ansluta. Testa igen om en stund.</div>";
             }
         }
 
         function renderFlights(data, destCode) {
             const resultsDiv = document.getElementById('results');
-            const cityName = cityLookup[destCode] || destCode;
-            let html = `<h3 style="text-align:center;">Flyg till ${cityName}</h3>`;
-
+            let html = `<h3>Bästa priserna till ${destCode}</h3>`;
+            
             for (let id in data) {
                 const f = data[id];
-                const departure = new Date(f.departure_at).toLocaleDateString('sv-SE');
-                
                 html += `
                     <div class="flight-card">
-                        <span style="color:var(--primary); font-weight:bold; text-transform:uppercase;">Direktflyg / Fynd</span>
-                        <span class="price">${f.price} kr</span>
-                        <div class="meta">
-                            📅 Datum: ${departure}<br>
-                            ✈️ Flygbolag: ${f.airline} (Kod)<br>
-                            🆔 Flight nr: ${f.flight_number}
-                        </div>
-                        <button style="background:var(--secondary); padding:10px; font-size:14px;" 
-                                onclick="window.open('https://www.aviasales.com')">
-                            BOKA PÅ REA
-                        </button>
-                    </div>
-                `;
+                        <span class="price">${f.price} kr</span><br>
+                        <span>📅 Datum: ${new Date(f.departure_at).toLocaleDateString()}</span><br>
+                        <small>Flygbolag: ${f.airline}</small>
+                        <button style="margin-top:10px; background:var(--secondary); padding:8px;" onclick="window.open('https://www.aviasales.com')">BOKA NU</button>
+                    </div>`;
             }
             resultsDiv.innerHTML = html;
         }
