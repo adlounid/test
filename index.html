@@ -3,169 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelSaver Pro - Flygbokning</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <style>
-        :root { --primary: #00b894; --secondary: #0984e3; --dark: #2d3436; }
-        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        
-        .header { text-align: center; margin-bottom: 20px; width: 100%; max-width: 400px; }
-        .header h1 { color: var(--primary); margin: 0; font-size: 2rem; }
-        
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
-        
-        label { display: block; margin-top: 10px; font-size: 0.8rem; color: #636e72; font-weight: bold; }
-        input { width: 100%; padding: 12px; margin: 5px 0 15px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; outline: none; }
-        input:focus { border-color: var(--primary); }
-        
-        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
-        button:active { transform: scale(0.98); background: #00a383; }
+    <title>CaféSync Push</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 
-        #results { width: 100%; max-width: 400px; margin-top: 20px; }
-        .flight-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; border-left: 6px solid var(--secondary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); animation: slideUp 0.3s ease-out; }
-        
-        .price { font-size: 1.6rem; font-weight: bold; color: var(--secondary); display: block; }
-        .details { font-size: 0.9rem; color: #2d3436; margin: 10px 0; line-height: 1.4; }
-        
-        .history { width: 100%; max-width: 400px; margin-top: 20px; font-size: 0.8rem; color: #636e72; }
-        .history-item { display: inline-block; background: #dfe6e9; padding: 5px 10px; border-radius: 5px; margin: 5px 5px 0 0; cursor: pointer; }
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body>
-
-    <div class="header">
-        <h1>TravelSaver ✈️</h1>
-        <p>Hitta flygfynd snabbt och enkelt</p>
-    </div>
-
-    <div class="card">
-        <label>VARIFRÅN?</label>
-        <input type="text" id="origin" placeholder="Stad eller kod (t.ex. ARN)" value="ARN">
-        
-        <label>VART VILL DU ÅKA?</label>
-        <input type="text" id="destination" placeholder="Stad eller kod (t.ex. Beirut)">
-        
-        <button onclick="getCheapFlights()">SÖK BILLIGASTE PRIS</button>
-    </div>
-
-    <div class="history" id="search-history">
-        </div>
-
-    <div id="results"></div>
-
-    <script>
-        // DIN AKTIVA API-TOKEN
-        const API_TOKEN = "07fe47ad1616e244c7ef99fb58e50b9b";
-
-        // Utökad lista för automatisk översättning
-        const cityToCode = {
-            "köpenhamn": "CPH", "copenhagen": "CPH", "cph": "CPH",
-            "stockholm": "ARN", "sthlm": "ARN", "arn": "ARN",
-            "beirut": "BEY", "beyrouth": "BEY", "bey": "BEY",
-            "london": "LON", "lhr": "LHR",
-            "paris": "PAR", "ory": "ORY", "cdg": "CDG",
-            "barcelona": "BCN", "bcn": "BCN",
-            "oslo": "OSL", "dubai": "DXB", "dxb": "DXB"
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxqE9HSkXGUlujX6x5xcvsz5rPxNCOq44",
+            authDomain: "fris-f38da.firebaseapp.com",
+            projectId: "fris-f38da",
+            messagingSenderId: "1048171458578",
+            appId: "1:1048171458578:web:0f77ace7c71f92bded28cb"
         };
 
-        async function getCheapFlights() {
-            let originRaw = document.getElementById('origin').value.toLowerCase().trim();
-            let destRaw = document.getElementById('destination').value.toLowerCase().trim();
-            
-            // Översätt stad till kod
-            let origin = cityToCode[originRaw] || originRaw.toUpperCase();
-            let dest = cityToCode[destRaw] || destRaw.toUpperCase();
+        // Initiera Firebase
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
 
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = "<p style='text-align:center;'>Letar efter sparade fynd...</p>";
-
-            // Spara sökningen i historiken
-            saveToHistory(origin, dest);
-
+        // Gör funktionen tillgänglig för knappen
+        window.initPush = async () => {
             try {
-                // CORS Proxy för att tillåta anrop från GitHub Pages
-                const proxy = "https://corsproxy.io/?";
-                const apiUrl = `https://api.travelpayouts.com/v1/prices/cheap?origin=${origin}&destination=${dest}&token=${API_TOKEN}&currency=SEK`;
-                
-                const response = await fetch(proxy + encodeURIComponent(apiUrl));
-                const json = await response.json();
+                const permission = await Notification.requestPermission();
+                if (permission !== "granted") {
+                    alert("Du måste tillåta notiser i webbläsaren!");
+                    return;
+                }
 
-                if (json.success && json.data && json.data[dest]) {
-                    renderFlights(json.data[dest], dest);
+                // Hämta din unika Token
+                // OBS: Ersätt DIN_VAPID_KEY med den du hittar i Firebase Console (Cloud Messaging -> Web Push certificates)
+                const token = await getToken(messaging, { 
+                    vapidKey: "DIN_VAPID_KEY_HÄR" 
+                });
+
+                if (token) {
+                    console.log("Din Token:", token);
+                    document.getElementById("token-display").innerText = token;
+                    alert("Token genererad! Kopiera den från skärmen.");
                 } else {
-                    resultsDiv.innerHTML = `
-                        <div class="card">
-                            <p>Inga sparade priser hittades för <b>${origin} ➔ ${dest}</b> just nu.</p>
-                            <small>Resedatabasen uppdateras när folk söker. Prova en annan stad eller försök igen senare.</small>
-                        </div>`;
+                    alert("Ingen token hittades. Kolla konsolen.");
                 }
             } catch (err) {
-                resultsDiv.innerHTML = "<div class='card' style='color:red;'>Anslutningsfel. Kontrollera internet.</div>";
+                console.error("Ett fel uppstod:", err);
             }
-        }
+        };
 
-        function renderFlights(data, destCode) {
-            const resultsDiv = document.getElementById('results');
-            let html = `<h3 style='text-align:center;'>Bästa träffar till ${destCode}</h3>`;
-            
-            // Sortera efter pris
-            const flights = Object.values(data).sort((a, b) => a.price - b.price);
-
-            flights.forEach(f => {
-                const depDate = new Date(f.departure_at).toLocaleDateString('sv-SE', {
-                    day: 'numeric', month: 'short', year: 'numeric'
-                });
-                
-                html += `
-                    <div class="flight-card">
-                        <span class="price">${f.price.toLocaleString()} kr</span>
-                        <div class="details">
-                            <b>Datum:</b> ${depDate}<br>
-                            <b>Flygbolag:</b> ${f.airline}<br>
-                            <b>Flight:</b> ${f.flight_number}
-                        </div>
-                        <button style="background:var(--secondary); padding:10px; font-size:14px;" 
-                                onclick="window.open('https://www.aviasales.com')">
-                            VISA BILJETT
-                        </button>
-                    </div>`;
-            });
-            resultsDiv.innerHTML = html;
-        }
-
-        function saveToHistory(from, to) {
-            let history = JSON.parse(localStorage.getItem('travelHistory')) || [];
-            const searchStr = `${from}-${to}`;
-            if (!history.includes(searchStr)) {
-                history.unshift(searchStr);
-                if (history.length > 5) history.pop();
-                localStorage.setItem('travelHistory', JSON.stringify(history));
-                displayHistory();
-            }
-        }
-
-        function displayHistory() {
-            const histDiv = document.getElementById('search-history');
-            let history = JSON.parse(localStorage.getItem('travelHistory')) || [];
-            if (history.length > 0) {
-                histDiv.innerHTML = "Senaste sökningar: <br>" + history.map(h => `
-                    <span class="history-item" onclick="quickSearch('${h}')">${h}</span>
-                `).join('');
-            }
-        }
-
-        function quickSearch(searchStr) {
-            const parts = searchStr.split('-');
-            document.getElementById('origin').value = parts[0];
-            document.getElementById('destination').value = parts[1];
-            getCheapFlights();
-        }
-
-        // Ladda historik vid start
-        displayHistory();
+        // Lyssna på notiser när fliken är ÖPPEN
+        onMessage(messaging, (payload) => {
+            console.log("Notis mottagen i öppen flik:", payload);
+            alert(`${payload.notification.title}: ${payload.notification.body}`);
+        });
     </script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center h-screen">
+
+<div class="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
+    <h1 class="text-3xl font-bold mb-4">CaféSync 🔔</h1>
+    <p class="text-gray-600 mb-6">Klicka på knappen för att aktivera push-notiser för denna enhet.</p>
+    
+    <button onclick="initPush()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-4 rounded-xl transition-all">
+        Aktivera notiser
+    </button>
+
+    <div class="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+        <p class="text-[10px] uppercase font-bold text-gray-400 mb-2">Din enhets Token:</p>
+        <p id="token-display" class="text-[10px] text-blue-600 break-all font-mono">Ingen token än...</p>
+    </div>
+</div>
+
 </body>
 </html>
